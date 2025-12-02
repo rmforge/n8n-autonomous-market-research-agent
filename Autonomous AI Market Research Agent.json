@@ -1,0 +1,440 @@
+{
+  "name": "AI Analyst",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 6
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        464,
+        416
+      ],
+      "id": "6c1c5734-973f-444d-8ed5-e6fd7b3c3e16",
+      "name": "Schedule Trigger",
+      "notesInFlow": false,
+      "executeOnce": false,
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "{\n  \"competitors\": [\n    {\"name\": \"Competitor_Alpha\"},\n    {\"name\": \"Competitor_Beta\"},\n    {\"name\": \"Competitor_Gamma\"}\n  ]\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        688,
+        416
+      ],
+      "id": "9887d9b4-ceb1-4e64-bd69-205d013a842a",
+      "name": "2. Competitors"
+    },
+    {
+      "parameters": {
+        "options": {
+          "reset": false
+        }
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        1136,
+        416
+      ],
+      "id": "bf6489a6-f1e9-4fe2-a72b-1a6f3fbab87a",
+      "name": "3. Split In Batches"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are a Senior Market Analyst. Your primary goal is to provide a concise, objective, and synthesized report on the target competitor. You must use your available tools (Web Research and Internal Reports) to gather facts before generating the final report.\n\nTarget Competitor: {{ $json.name }}\n\nFormat: Return the synthesized report as a single JSON object with the keys: \"Competitor\", \"Summary\", \"News_Highlights\", and \"Internal_Context\".",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3,
+      "position": [
+        1424,
+        416
+      ],
+      "id": "9e5015f2-cad8-44ca-a3d0-c5570638ccfc",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        1376,
+        672
+      ],
+      "id": "df1edeed-db95-49ef-8a6c-2a5ba2dd010f",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "YOUR_GEMINI_API_KEY_HERE",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "description": "Accesses internal, historical reports and pricing data for internal context and pricing strategies.",
+        "workflowId": {
+          "__rl": true,
+          "value": "wnheJV33ZAcUX0Mc",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/wnheJV33ZAcUX0Mc",
+          "cachedResultName": "Tool_RAG_Reports"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        1536,
+        736
+      ],
+      "id": "6d6c1066-fc83-4f50-88d7-870110434256",
+      "name": "RAG_Internal_Reports_Caller"
+    },
+    {
+      "parameters": {
+        "description": "Provides up-to-date news and public announcements from the web.",
+        "workflowId": {
+          "__rl": true,
+          "value": "Mpn7T0GHfZpATKiA",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/Mpn7T0GHfZpATKiA",
+          "cachedResultName": "Tool Workflow 1 (Web Research)"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        1728,
+        736
+      ],
+      "id": "7854a3c4-7a0e-4ece-b570-42d2122922a8",
+      "name": "Web_Research_Live_News_Caller"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. Get the raw output text from the AI Agent node\n// CORRECTED: Changed .response to .output based on your node's actual data structure\nconst agentOutput = $input.first().json.output;\n\n// 2. Check if the output is valid before proceeding\nif (!agentOutput || typeof agentOutput !== 'string' || agentOutput.trim().length === 0) {\n    console.error(\"AI Agent returned no valid string output.\");\n    // Return an error object to prevent flow halt, but log the failure\n    return [{ json: { error: \"AI Output Empty\", raw: agentOutput } }];\n}\n\n// 3. Proceed with JSON extraction and parsing\nconst jsonMatch = agentOutput.match(/\\{[\\s\\S]*\\}/);\n\nif (jsonMatch && jsonMatch[0]) {\n    try {\n        const parsedJson = JSON.parse(jsonMatch[0]);\n        // Successfully parsed and structured data\n        return [{ json: parsedJson }];\n    } catch (e) {\n        console.error(\"Failed to parse final JSON:\", e);\n        // Failed parsing due to bad JSON format\n        return [{ json: { error: \"JSON Parsing Failed\", raw: jsonMatch[0] } }];\n    }\n} else {\n    // LLM returned text, but no valid JSON block was found (Regex failure)\n    return [{ json: { error: \"No JSON Structure Found\", raw: agentOutput } }];\n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1824,
+        416
+      ],
+      "id": "25f50b70-28ce-4749-b6d0-96c5c2f8b658",
+      "name": "Format_Final_JSON"
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C09V97QA265",
+          "mode": "list",
+          "cachedResultName": "ai-reports"
+        },
+        "text": "=*DAILY AI ANALYST REPORT: {{ $json.Competitor }}* --------------------------------------------------------- *Summary:* {{ $json.Summary }}  *News Highlights:* {{ $json.News_Highlights }}  *Internal Context:* {{ $json.Internal_Context }}",
+        "otherOptions": {}
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [
+        2048,
+        416
+      ],
+      "id": "6ec1b114-e5ef-4749-b335-1971a437ddf3",
+      "name": "Send a message",
+      "webhookId": "59f9f825-c1c3-45d8-b762-f44f1c6fa66b",
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "gf4J20L6O4Ls0eEV",
+          "name": "Slack account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1ZxvXVyRgm6L1hPTI0IWb1BFJENQ6jKyLatFF69d6eQw",
+          "mode": "list",
+          "cachedResultName": "AI_Analyst_Audit_Log",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1ZxvXVyRgm6L1hPTI0IWb1BFJENQ6jKyLatFF69d6eQw/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1ZxvXVyRgm6L1hPTI0IWb1BFJENQ6jKyLatFF69d6eQw/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Summary:": "={{ $('Format_Final_JSON').item.json.Summary }}",
+            "News_Highlights:": "={{ $('Format_Final_JSON').item.json.News_Highlights }}",
+            "Internal_Context": "={{ $('Format_Final_JSON').item.json.Internal_Context }}",
+            "Date_Ran:": "={{ new Date().toISOString() }}",
+            "Competitor:": "={{ $('Format_Final_JSON').item.json.Competitor }}"
+          },
+          "matchingColumns": [
+            "Competitor:"
+          ],
+          "schema": [
+            {
+              "id": "Competitor:",
+              "displayName": "Competitor:",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Summary:",
+              "displayName": "Summary:",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "News_Highlights:",
+              "displayName": "News_Highlights:",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Internal_Context",
+              "displayName": "Internal_Context",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Date_Ran:",
+              "displayName": "Date_Ran:",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2272,
+        416
+      ],
+      "id": "be282bde-66f3-4a9b-b2e6-1157e8ab126b",
+      "name": "Audit Log",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "JZCg9pNRLBOxxDb7",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "competitors",
+        "options": {}
+      },
+      "id": "4154f5c0-ac0d-49da-9754-b9d3711058da",
+      "name": "Item Lists",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        912,
+        416
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "2. Competitors",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "3. Split In Batches": {
+      "main": [
+        [],
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RAG_Internal_Reports_Caller": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Web_Research_Live_News_Caller": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Format_Final_JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format_Final_JSON": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message": {
+      "main": [
+        [
+          {
+            "node": "Audit Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "2. Competitors": {
+      "main": [
+        [
+          {
+            "node": "Item Lists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Item Lists": {
+      "main": [
+        [
+          {
+            "node": "3. Split In Batches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Audit Log": {
+      "main": [
+        [
+          {
+            "node": "3. Split In Batches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "6a8faff7-c148-42d8-87f8-5b0cb512635c",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "8c92defd2c69e8f659277e0758537425b76ab726eef18f35d9e39864147600db"
+  },
+  "id": "5Y25ngOOrHdzJ1fK",
+  "tags": []
+}
