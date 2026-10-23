@@ -1,35 +1,36 @@
 # n8n-autonomous-market-research-agent
-# 🤖 Autonomous n8n workflow for competitive intelligence using AI Agents.
 
-This project demonstrates a production-grade AI Agent workflow built using n8n for automated competitive intelligence and strategic analysis.
+> **Reference build:** a public demo of a pattern. The data sources are simulated, and this is not a client deployment.
 
-**Problem Solved:** Elimination of manual, expensive, and biased competitor research processes.
+An n8n workflow that uses an AI agent for competitive intelligence: it researches a list of competitors and routes a structured brief to Slack and Google Sheets.
 
-## Architecture & Features
+**Problem addressed:** manual competitor research is slow, costly and open to bias. This workflow shows how an agent can do the research and formatting, so a person only reads the finished brief.
 
-### 1. The Autonomous Core (Agentic Logic)
-The workflow employs a **Google Gemini Pro AI Agent** that acts as a Senior Market Analyst. The Agent is configured with specialized tools and logic to:
-* **Dynamic Tool Calling:** Autonomously decide whether to use the Web Research tool or the Internal RAG tool based on the prompt.
-* **Structured Output:** Forced JSON generation to ensure clean data for downstream services.
+## Architecture and features
 
-### 2. Modular Tooling (Sub-Workflows)
-The Agent interacts with two key internal sub-workflows (Tools):
-* **Web Research Tool:** Simulates real-time public data gathering.
-* **Internal RAG Tool:** Simulates accessing proprietary, historical business context.
+### 1. The agent core
+A Google Gemini Pro AI agent acts as a senior market analyst. It is configured with specialized tools and logic to:
 
-### 3. Data Flow & Result
-The system processes competitors in a loop, parses the LLM output using JavaScript with null-check error handling, and routes the final data to Slack for immediate alerting and Google Sheets for audit logging.
+* **Dynamic tool calling:** decide on its own whether to use the web research tool or the internal RAG tool, based on the prompt.
+* **Structured output:** produce forced JSON, so the data is clean for downstream steps.
 
+### 2. Modular tools (sub-workflows)
+The agent uses two internal sub-workflows as tools:
 
+* **Web research tool:** simulates real-time public data gathering.
+* **Internal RAG tool:** simulates access to proprietary, historical business context.
 
-## Files in this Repository
+### 3. Data flow and result
+The workflow processes competitors in a loop, parses the model output with JavaScript that includes null-check error handling, and routes the result to Slack for immediate alerting and to Google Sheets for audit logging.
 
-* `autonomous_research_agent.json`: The sanitized n8n workflow file.
-* `README.md`: This document.
+## Files in this repository
 
-## How to Run Locally
+* `autonomous_research_agent.json`: the sanitized n8n workflow file.
+* `README.md`: this document.
 
-1.  Install n8n (or use n8n Cloud).
-2.  Import the `autonomous_research_agent.json` file.
-3.  Configure the **Gemini API Key** and Slack/Google Sheets credentials.
-4.  Execute the Schedule Trigger.
+## How to run locally
+
+1. Install n8n (or use n8n Cloud).
+2. Import the `autonomous_research_agent.json` file.
+3. Configure the Gemini API key and the Slack and Google Sheets credentials.
+4. Execute the Schedule Trigger.
